@@ -1,5 +1,5 @@
 gtts
-pygame
 streamlit
 speechrecognition
+pyaudio
 googletrans==3.1.0a0
