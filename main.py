@@ -1,5 +1,4 @@
-import os
-import pygame
+import io
 from gtts import gTTS
 import streamlit as st
 import speech_recognition as sr
@@ -8,24 +7,25 @@ from googletrans import LANGUAGES, Translator
 class LanguageTranslator:
     def __init__(self):
         self.translator = Translator()
-        pygame.mixer.init()
         self.language_mapping = {name: code for code, name in LANGUAGES.items()}
-        self.is_translate_on = False
-        
+
     def get_language_code(self, language_name):
         return self.language_mapping.get(language_name, language_name)
     
     def translator_function(self, spoken_text, from_language, to_language):
-        return self.translator.translate(spoken_text, src=from_language, dest=to_language)
+        try:
+            return self.translator.translate(spoken_text, src=from_language, dest=to_language)
+        except Exception as e:
+            st.error(f"Translation service error: {e}")
+            raise
     
     def text_to_voice(self, text_data, to_language):
         try:
+            audio_bytes = io.BytesIO()
             myobj = gTTS(text=text_data, lang=to_language, slow=False)
-            myobj.save("cache_file.mp3")
-            audio = pygame.mixer.Sound("cache_file.mp3")
-            audio.play()
-            pygame.time.wait(int(audio.get_length() * 1000))  # Wait for audio to finish
-            os.remove("cache_file.mp3")
+            myobj.write_to_fp(audio_bytes)
+            audio_bytes.seek(0)
+            st.audio(audio_bytes, format='audio/mp3')
         except Exception as e:
             st.error(f"Text-to-Speech Error: {e}")
     
@@ -83,16 +83,24 @@ def main():
     # Sidebar for language selection
     st.sidebar.header("Translation Settings")
     
-    # Language selection dropdowns
+    # Language selection dropdowns (robust default indices)
+    languages_list = list(LANGUAGES.values())
+
+    default_src = next((i for i, v in enumerate(languages_list) if v.lower() == "english"), 0)
+    default_dst = next(
+        (i for i, v in enumerate(languages_list) if v.lower() == "spanish"),
+        1 if len(languages_list) > 1 else 0,
+    )
+
     from_language_name = st.sidebar.selectbox(
         "Source Language", 
-        list(LANGUAGES.values()), 
-        index=list(LANGUAGES.values()).index('english')
+        languages_list, 
+        index=default_src,
     )
     to_language_name = st.sidebar.selectbox(
         "Target Language", 
-        list(LANGUAGES.values()), 
-        index=list(LANGUAGES.values()).index('spanish')
+        languages_list, 
+        index=default_dst,
     )
     
     # Convert language names to language codes
